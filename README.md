@@ -150,6 +150,9 @@ node test/smoke.mjs        # renders the pill and the popover with window/React 
 - Interception matches the row copy `Effort` / `推理等级`; if the Harness renames it, interception goes quiet
   and the pill still works.
 - A model without reasoning metadata has no ladder to write, so the five levels cannot exist for it.
+- A session's model directory can be unreachable during the first cold render (the slot kit caches one
+  injected face per binding). The pill then shows `Effort: …` and keeps retrying — clickable meanwhile —
+  instead of freezing until the window is reloaded.
 
 ## Compatibility
 
@@ -293,6 +296,8 @@ node test/smoke.mjs        # 用 window/React stub 渲染药丸与弹层
 - 弹层固定在 composer 卡片上方 10px，不做上下翻转；视口极矮时可能顶出屏幕。
 - 拦截依赖菜单行文案 `Effort` / `推理等级`；宿主改文案后拦截失效，药丸仍可用。
 - 没有 reasoning 元数据的模型没有梯子可写，五档对它不成立。
+- 冷启动首帧时会话的模型目录可能还没就绪（slot 的 inject 按 binding 缓存）。这时药丸显示 `Effort: …`
+  并持续重试、仍然可以点开，而不是冻在那里等窗口刷新。
 
 ### 兼容性
 

@@ -115,6 +115,8 @@ const sandbox = {
 	cancelAnimationFrame: fakeWindow.cancelAnimationFrame,
 	setTimeout,
 	clearTimeout,
+	setInterval,
+	clearInterval,
 	Math,
 	Date,
 	JSON,
@@ -209,6 +211,9 @@ const t = (key) => key;
 
 function injected(entry, sessionId) {
 	const face = entry.options.inject(sessionId);
+	// The renderer binds `hooks.*` with useSyncExternalStore, which subscribes;
+	// subscribing is also what makes the directory proxy resolve its target.
+	face.hooks.effortDirectory.subscribe(() => {});
 	const { hooks: _hooks, ...props } = face;
 	// `t` and the hook are bound by the slot kit; the stub mirrors that binding.
 	return {
@@ -389,6 +394,64 @@ assert.equal(pillEntry.component(injected(pillEntry, 'session-2')), null, 'no pi
 	const panel = typeof unsupported.type === 'function' ? unsupported.type(unsupported.props) : unsupported;
 	assert.ok(textOf(panel).includes('unsupported'), 'panel explains the missing ladder');
 	props.controller.close();
+}
+
+/* --- cold-start directory lookup retries -------------------------------- */
+
+{
+	// A slot inject face is cached per binding, so the first cold render must not
+	// be able to freeze the control: the injected store retries until the session
+	// exposes its directory.
+	let attempts = 0;
+	const flaky = {
+		directoryFor: () => {
+			attempts += 1;
+			if (attempts <= 2) throw new Error('session "' + 'session-3' + '" resolved no scope');
+			return directory;
+		},
+	};
+	const flakyCtx = {
+		get: (name) => ({ modelDirectories: flaky })[name],
+		effect: (factory) => {
+			const stop = factory();
+			return typeof stop === 'function' ? stop : () => {};
+		},
+		locale: { register: () => () => {} },
+		slots: {
+			inject: (_key, callback) => callback(),
+			register: (options, component) => {
+				flakyRegistrations.push({ options, component });
+				return () => {};
+			},
+		},
+	};
+	const flakyRegistrations = [];
+	plugin.apply(flakyCtx);
+	const entry = flakyRegistrations.find((row) => row.options.name === 'conversation.input.right');
+	const face = entry.options.inject('session-3');
+	const store = face.hooks.effortDirectory;
+
+	assert.equal(store.getSnapshot(), null, 'no snapshot before the directory resolves');
+	assert.equal(face.getDirectory(), null, 'no directory before the retry lands');
+
+	const pendingPill = entry.component({
+		...face,
+		t,
+		...{ useEffortDirectory: (selector) => selector(store.getSnapshot()) },
+	});
+	assert.equal(textOf(pendingPill), 'Effort: …', 'pending pill still renders a label');
+	assert.notEqual(pendingPill.props.disabled, true, 'pending pill is not disabled');
+	assert.equal(typeof pendingPill.props.onClick, 'function', 'pending pill opens the popover');
+
+	let notified = 0;
+	store.subscribe(() => {
+		notified += 1;
+	});
+	await new Promise((resolve) => setTimeout(resolve, 900));
+
+	assert.ok(store.getSnapshot(), 'the proxy resolved the directory on a retry');
+	assert.ok(face.getDirectory(), 'writes can now reach the directory');
+	assert.ok(notified > 0, 'subscribers were told when it resolved');
 }
 
 console.log('smoke: ok');

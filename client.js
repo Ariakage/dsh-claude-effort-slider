@@ -791,18 +791,29 @@ void main() {
 			}, [sessionId]);
 
 			if (!view.usable) {
+				// Still resolving the session's model directory: stay clickable so the
+				// popover can say so instead of looking dead.
 				if (!view.loading) return null;
 				return h(
 					'button',
 					{
+						ref: buttonRef,
 						type: 'button',
-						className: 'ccs-pill',
-						disabled: true,
+						className: 'ccs-pill ccs-pill--pending',
 						'data-ccs-root': '',
+						'aria-haspopup': 'dialog',
+						'aria-expanded': panel.open ? 'true' : 'false',
+						'aria-label': 'Effort: ' + t('loading'),
 						title: t('loading'),
+						onClick: (event) => {
+							event.stopPropagation();
+							const element = buttonRef.current;
+							controller.toggle(element, element ? element.getBoundingClientRect() : null);
+						},
 					},
 					GAUGE_ICON,
-					h('span', { className: 'ccs-pill__text' }, 'Effort: …')
+					h('span', { className: 'ccs-pill__text' }, 'Effort: …'),
+					CHEVRON_ICON
 				);
 			}
 
@@ -925,9 +936,10 @@ void main() {
 					if (readFlag(sessionId) !== on) controller.touch();
 					writeFlag(sessionId, on);
 					const current = viewRef.current;
-					if (current.usable) writeLevel(props.directory, current, clamped);
+					const directory = typeof props.getDirectory === 'function' ? props.getDirectory() : null;
+					if (current.usable && directory) writeLevel(directory, current, clamped);
 				},
-				[animateLabel, controller, props.directory, sessionId]
+				[animateLabel, controller, props.getDirectory, sessionId]
 			);
 
 			const settleRef = useRef(settle);
@@ -1248,6 +1260,7 @@ void main() {
 			const description = info.warning || info.desc;
 
 			if (!view.usable) {
+				const note = view.loading ? t('loading') : t('unsupported');
 				return h(
 					'div',
 					{ ref: layerRef, className: 'ccs-layer', 'data-ccs-root': '', 'data-ccs-panel': '' },
@@ -1261,16 +1274,16 @@ void main() {
 								'div',
 								{ className: 'ccs-popover__status' },
 								h('span', { className: 'ccs-popover__title' }, 'Effort'),
-								h('span', { className: 'ccs-level' }, '—')
+								h('span', { className: 'ccs-level' }, view.loading ? '…' : '—')
 							),
 							h('button', {
 								type: 'button',
 								className: 'ccs-help',
 								'aria-label': t('help'),
-								'data-tip': t('unsupported'),
+								'data-tip': note,
 							}, '?')
 						),
-						h('p', { className: 'ccs-desc is-note' }, t('unsupported'))
+						h('p', { className: 'ccs-desc is-note' }, note)
 					)
 				);
 			}
@@ -1430,11 +1443,117 @@ void main() {
 		   Plugin
 		   ================================================================ */
 
-		/** Hook source used when a session exposes no model directory at all. */
-		const EMPTY_DIRECTORY_STORE = {
-			getSnapshot: () => null,
-			subscribe: () => () => {},
-		};
+		/**
+		 * Retry budget for resolving a session's model directory. The slot kit
+		 * caches one injected face per binding, so a lookup that fails during the
+		 * first cold render — before the session has a scope and a binding —
+		 * would otherwise freeze the control for the life of the page.
+		 */
+		const DIRECTORY_RETRY_LIMIT = 40;
+		const DIRECTORY_RETRY_INTERVAL_MS = 300;
+
+		/**
+		 * A store that keeps trying to reach the session's shared model directory
+		 * and then proxies it: `null` until the first successful lookup, the real
+		 * snapshot afterwards. Subscribing starts the retry loop, so a pill that
+		 * mounted too early still becomes usable without a reload.
+		 * @param {() => object|null} resolve - one lookup attempt.
+		 * @returns {{store: {getSnapshot: () => object|null, subscribe: (fn: () => void) => () => void}, directory: () => object|null, dispose: () => void}}
+		 */
+		function createDirectoryProxy(resolve) {
+			let target = null;
+			let snapshot = null;
+			let stopTarget = null;
+			let timer = null;
+			let attempts = 0;
+			let disposed = false;
+			const listeners = new Set();
+
+			const emit = () => {
+				for (const listener of [...listeners]) {
+					try {
+						listener();
+					} catch (error) {
+						console.error('[' + PKG_ID + '] directory listener failed:', error);
+					}
+				}
+			};
+
+			const stopTimer = () => {
+				if (timer === null) return;
+				clearInterval(timer);
+				timer = null;
+			};
+
+			const settle = () => {
+				if (disposed || target !== null) return;
+				attempts += 1;
+				let next = null;
+				try {
+					next = resolve();
+				} catch (_error) {
+					next = null;
+				}
+				if (!next) {
+					if (attempts >= DIRECTORY_RETRY_LIMIT) {
+						stopTimer();
+						emit();
+					}
+					return;
+				}
+				stopTimer();
+				target = next;
+				try {
+					snapshot = next.store.getSnapshot();
+				} catch (_error) {
+					snapshot = null;
+				}
+				stopTarget = next.store.subscribe(() => {
+					try {
+						snapshot = next.store.getSnapshot();
+					} catch (_error) {
+						snapshot = null;
+					}
+					emit();
+				});
+				// The shipped menu loads on open; doing it here means the pill and the
+				// popover show real levels as soon as the directory is reachable.
+				try {
+					Promise.resolve(next.load()).catch(() => {});
+				} catch (_error) {
+					/* keep the snapshot we have */
+				}
+				emit();
+			};
+
+			const startTimer = () => {
+				if (disposed || target !== null || timer !== null) return;
+				if (attempts >= DIRECTORY_RETRY_LIMIT) return;
+				timer = setInterval(settle, DIRECTORY_RETRY_INTERVAL_MS);
+			};
+
+			return {
+				store: {
+					getSnapshot: () => (target === null ? null : snapshot),
+					subscribe(listener) {
+						listeners.add(listener);
+						settle();
+						startTimer();
+						return () => {
+							listeners.delete(listener);
+						};
+					},
+				},
+				directory: () => target,
+				dispose() {
+					disposed = true;
+					stopTimer();
+					if (typeof stopTarget === 'function') stopTarget();
+					stopTarget = null;
+					listeners.clear();
+				},
+			};
+		}
 
 		/** Text shown by the pill while the catalog is still loading. */
 		const LOCALE_EN = {
@@ -1469,15 +1588,21 @@ void main() {
 
 			const controller = createController();
 
-			const directoryFor = (sessionId) => {
-				if (sessionId === undefined || sessionId === null) return null;
-				try {
-					return directories.directoryFor(sessionId);
-				} catch (error) {
-					console.warn('[' + PKG_ID + '] no model directory for the session:', error);
-					return null;
-				}
+			/** One retrying proxy per session, shared by the pill and the popover. */
+			const proxies = new Map();
+			const proxyFor = (sessionId) => {
+				const key = String(sessionId);
+				const existing = proxies.get(key);
+				if (existing !== undefined) return existing;
+				const proxy = createDirectoryProxy(() => directories.directoryFor(sessionId));
+				proxies.set(key, proxy);
+				return proxy;
 			};
+
+			ctx.effect(() => () => {
+				for (const proxy of proxies.values()) proxy.dispose();
+				proxies.clear();
+			}, 'cc-effort-slider: directory proxies');
 
 			ctx.slots.inject('conversation.input.right', () =>
 				ctx.slots.register(
@@ -1487,15 +1612,13 @@ void main() {
 						order: 40,
 						locale: NS,
 						inject: (sessionId) => {
-							const directory = directoryFor(sessionId);
+							const proxy = proxyFor(sessionId);
 							// A slot inject face spreads every non-`hooks` key as props.
 							return {
-								hooks: {
-									effortDirectory: directory === null ? EMPTY_DIRECTORY_STORE : directory.store,
-								},
+								hooks: { effortDirectory: proxy.store },
 								sessionId,
 								controller,
-								directory,
+								getDirectory: proxy.directory,
 							};
 						},
 					},
@@ -1511,15 +1634,13 @@ void main() {
 						order: 60,
 						locale: NS,
 						inject: (sessionId) => {
-							const directory = directoryFor(sessionId);
+							const proxy = proxyFor(sessionId);
 							// A slot inject face spreads every non-`hooks` key as props.
 							return {
-								hooks: {
-									effortDirectory: directory === null ? EMPTY_DIRECTORY_STORE : directory.store,
-								},
+								hooks: { effortDirectory: proxy.store },
 								sessionId,
 								controller,
-								directory,
+								getDirectory: proxy.directory,
 							};
 						},
 					},
