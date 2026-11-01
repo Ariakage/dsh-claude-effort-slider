@@ -1,0 +1,4 @@
+# Claude Desktop–style effort slider (browser half owns the control).
+- insert:
+    - id: ui-claude-effort-slider
+      name: dsh-claude-effort-slider

@@ -1,0 +1,56 @@
+{
+  "name": "dsh-claude-effort-slider",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Claude Desktop-style effort slider for DeepSeek Harness: replaces the Effort switch with a draggable Low→Ultracode slider and the Ultracode energy grid.",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "claude-desktop",
+    "effort",
+    "reasoning-effort",
+    "thinking-effort",
+    "slider",
+    "webgl2"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ariakage/dsh-claude-effort-slider.git"
+  },
+  "homepage": "https://github.com/Ariakage/dsh-claude-effort-slider#readme",
+  "bugs": {
+    "url": "https://github.com/Ariakage/dsh-claude-effort-slider/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "docs/*.png",
+    "test/*.mjs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-model-selection"
+      ]
+    }
+  }
+}

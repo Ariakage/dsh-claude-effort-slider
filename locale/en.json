@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Claude Effort Slider",
+    "description": "Replaces the Effort switch with a Claude Desktop-style slider: Low / Medium / High / Max / Ultracode, with the Ultracode energy grid. Ultracode drives the model's maximum thinking effort."
+  }
+}

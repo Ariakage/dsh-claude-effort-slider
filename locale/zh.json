@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Claude 推理等级滑块",
+    "description": "用 Claude Desktop 风格的滑块替换 Effort 切换：Low / Medium / High / Max / Ultracode 五档，Ultracode 点亮能量网格，并映射到模型的最大思考强度。"
+  }
+}
