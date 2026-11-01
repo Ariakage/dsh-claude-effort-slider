@@ -10,9 +10,9 @@
 
 **English** · [中文](#中文)
 
-![reference](docs/reference.png)
+![The Effort popover in DeepSeek Harness](docs/harness.png)
 
-*The reference design this ports — the standalone `index.html` demo, not a Harness screenshot.*
+*Running in DeepSeek Harness: the `Effort: Ultracode` pill beside the model seat, and the popover with the Ultracode grid lit.*
 
 ---
 
@@ -99,7 +99,7 @@ cordis.patch.yml     bundle patch: inserts the `ui-claude-effort-slider` row
 locale/{en,zh}.json  plugin inventory title / description
 icon.svg             inventory artwork
 test/smoke.mjs       render smoke test (window + React stubs, no browser)
-docs/reference.png   the reference design
+docs/harness.png     the control running in DeepSeek Harness
 ```
 
 The browser half registers two slot entries:
@@ -139,7 +139,7 @@ node test/smoke.mjs        # renders the pill and the popover with window/React 
   slider's ARIA, the grid canvas, `Home → low`, `→ → medium`, `End → max` plus the Ultracode flag, the
   no-ladder state, and the Effort-row interception with the modifier-key pass-through.
 - Installed on DSH Desktop and observed in the running window: the pill, the popover, the Ultracode grid and
-  the effort write all work. The screenshot in this repo is the reference design only.
+  the effort write all work — the screenshot above is that window.
 
 ## Known limits
 
@@ -166,9 +166,9 @@ app). Developed and installed on DSH Desktop (macOS, Electron web GUI, DSH 0.2.x
 
 [English](#dsh-claude-effort-slider) · **中文**
 
-![reference](docs/reference.png)
+![DeepSeek Harness 里的 Effort 弹层](docs/harness.png)
 
-*这张是移植来源的参考设计（独立 demo 页面），不是 Harness 截图。*
+*实际运行在 DeepSeek Harness 里：模型座位旁的 `Effort: Ultracode` 药丸，以及点亮 Ultracode 网格的弹层。*
 
 ### 它做什么
 
@@ -250,7 +250,7 @@ cordis.patch.yml     bundle patch：插入 `ui-claude-effort-slider` 行
 locale/{en,zh}.json  插件清单里的标题与描述
 icon.svg             清单图标
 test/smoke.mjs       渲染冒烟测试（window + React stub，不需要浏览器）
-docs/reference.png   参考设计图
+docs/harness.png     实机截图（DeepSeek Harness 中运行）
 ```
 
 浏览器半边注册两个 slot 条目：
@@ -284,7 +284,7 @@ node test/smoke.mjs        # 用 window/React stub 渲染药丸与弹层
 
 - `test/smoke.mjs` 覆盖：模块形状、两个 slot 注册、药丸文案、五个刻度、slider 的 ARIA、网格 canvas、
   `Home → low`、`→ → medium`、`End → max` 且置位 Ultracode 标记、无档位模型的状态、Effort 行拦截与修饰键放行。
-- 已在 DSH Desktop 实装并观察：药丸、弹层、Ultracode 网格、档位写入都正常。仓库里的截图只是参考设计图。
+- 已在 DSH Desktop 实装并观察：药丸、弹层、Ultracode 网格、档位写入都正常，上面那张就是实机画面。
 
 ### 已知边界
 
