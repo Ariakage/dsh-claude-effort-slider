@@ -1,6 +1,6 @@
 {
   "name": "dsh-claude-effort-slider",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Claude Desktop-style effort slider for DeepSeek Harness: replaces the Effort switch with a draggable Low→Ultracode slider and the Ultracode energy grid.",
